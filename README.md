@@ -24,7 +24,7 @@ A decentralized network power by @ton_blockchain, backed by @Ton_Incubator. Cont
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/Zlkcyber/heviraBot.git
+   git clone https://github.com/Zlkcyber/hiveraBot.git
    cd hiveraBot
    ```
 2. Install dependencies:
