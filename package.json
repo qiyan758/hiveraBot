@@ -13,6 +13,7 @@
   "dependencies": {
     "fs": "^0.0.1-security",
     "node-fetch": "^3.3.2",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "https-proxy-agent": "^7.0.2"
   }
 }
