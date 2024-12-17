@@ -20,9 +20,32 @@ async function readUserFile(filePath) {
     }
 }
 
-async function fetchAuthData(userData) {
+async function readProxyFile(filePath) {
     try {
-        const response = await fetch(`${url}auth?auth_data=${encodeURIComponent(userData)}`);
+        const data = await fs.readFile(filePath, 'utf-8');
+        const proxyArray = data.split('\n').map(line => line.trim()).filter(line => line);
+        if (proxyArray.length === 0) {
+            log.warn('No proxies found in the file.');
+        }
+        return proxyArray;
+    } catch (error) {
+        log.error('Error reading proxy file:', error);
+        return [];
+    }
+}
+
+// Create agent with proxy
+async function createProxyAgent(proxyUrl) {
+    if (!proxyUrl) return null;
+    const { HttpsProxyAgent } = await import('https-proxy-agent');
+    return new HttpsProxyAgent(proxyUrl);
+}
+
+async function fetchAuthData(userData, agent) {
+    try {
+        const response = await fetch(`${url}auth?auth_data=${encodeURIComponent(userData)}`, {
+            agent: agent
+        });
         if (!response.ok) {
             throw new Error(`HTTP Error! Status: ${response.status}`);
         }
@@ -33,10 +56,11 @@ async function fetchAuthData(userData) {
     }
 }
 
-async function fetchInfoData(userData) {
+async function fetchInfoData(userData, agent) {
     try {
-        const response = await fetch(`${url}referral?referral_code=2b6a4dfc8&auth_data=${encodeURIComponent(userData)}`);
-
+        const response = await fetch(`${url}referral?referral_code=2b6a4dfc8&auth_data=${encodeURIComponent(userData)}`, {
+            agent: agent
+        });
         return response;
     } catch (error) {
         log.error("Error fetching info data:", error);
@@ -44,9 +68,11 @@ async function fetchInfoData(userData) {
     }
 }
 
-async function fetchPowerData(userData) {
+async function fetchPowerData(userData, agent) {
     try {
-        const response = await fetch(`${url}engine/info?auth_data=${encodeURIComponent(userData)}`);
+        const response = await fetch(`${url}engine/info?auth_data=${encodeURIComponent(userData)}`, {
+            agent: agent
+        });
         if (!response.ok) {
             throw new Error(`HTTP Error! Status: ${response.status}`);
         }
@@ -67,7 +93,7 @@ function generatePayload() {
     };
 }
 
-async function contribute(userData) {
+async function contribute(userData, agent) {
     try {
         const payload = generatePayload();
         const response = await fetch(`${url}engine/contribute?auth_data=${encodeURIComponent(userData)}`, {
@@ -76,6 +102,7 @@ async function contribute(userData) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
+            agent: agent
         });
         if (!response.ok) {
             throw new Error(`HTTP Error! Status: ${response.status}`);
@@ -87,22 +114,22 @@ async function contribute(userData) {
     }
 }
 
-async function processUser(userData) {
+async function processUser(userData, proxy) {
     try {
-        const profile = await fetchAuthData(userData);
+        const agent = await createProxyAgent(proxy);
+        const info = await fetchInfoData(userData, agent)
+        const profile = await fetchAuthData(userData, agent);
         const username = profile?.result?.username || 'Unknown';
 
-        const infoData = await fetchInfoData(userData);
-        const powerData = await fetchPowerData(userData);
-
+        const powerData = await fetchPowerData(userData, agent);
         const hivera = powerData?.result?.profile?.HIVERA || 0;
         let power = powerData?.result?.profile?.POWER || 0;
 
-        log.info(`Username: ${username} | Hivera: ${hivera} | Power: ${power}`);
+        log.info(`Username: ${username} | Hivera: ${hivera} | Power: ${power} | Proxy: ${proxy || 'None'}`);
 
         // Start mining
         while (power > 500) {
-            const contributeData = await contribute(userData);
+            const contributeData = await contribute(userData, agent);
             if (contributeData) {
                 log.info(`Mining successfully for user: ${username}`);
                 log.info(contributeData?.result?.profile);
@@ -112,26 +139,35 @@ async function processUser(userData) {
             }
         }
 
-        log.warn(`User ${username} does not have enough power to mine.`);
+        log.warn(`User ${username} does not have enough power to mine. Cooling down for 35 minutes.`);
+        await new Promise(resolve => setTimeout(resolve, 35 * 60 * 1000));
     } catch (error) {
-        log.error(`Error processing user ${userData}:`, error);
+        log.error(`Error processing user ${userData} with proxy ${proxy}:`, error);
     }
 }
 
 async function main() {
     log.info(beddu);
     const userDatas = await readUserFile('users.txt');
+    const proxyList = await readProxyFile('proxies.txt');
+
     if (userDatas.length === 0) {
         log.error('No user data found in the file.');
         process.exit(0);
     }
 
+    if (proxyList.length === 0) {
+        log.warn('No proxies found in the file. Proceeding without proxies.');
+    }
+
     while (true) {
         log.info('Starting processing for all users...');
-        await Promise.all(userDatas.map(userData => processUser(userData)));
+        await Promise.all(userDatas.map(async (userData, index) => {
+            const proxy = proxyList.length > 0 ? proxyList[index % proxyList.length] : null;
+            await processUser(userData, proxy);
+        }));
 
-        log.warn('Power is not enough for all users, cooldown 35 minutes...');
-        await new Promise(resolve => setTimeout(resolve, 35 * 60 * 1000));
+        log.info('All users processed. Restarting the loop...');
     }
 }
 
