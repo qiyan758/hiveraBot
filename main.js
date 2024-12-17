@@ -116,12 +116,12 @@ async function contribute(userData, agent) {
 
 async function processUser(userData, proxy) {
     try {
-        const profile = await fetchAuthData(userData);
+        const agent = await createProxyAgent(proxy);
+        const info = await fetchInfoData(userData, agent)
+        const profile = await fetchAuthData(userData, agent);
         const username = profile?.result?.username || 'Unknown';
 
-        const infoData = await fetchInfoData(userData);
-        const powerData = await fetchPowerData(userData);
-
+        const powerData = await fetchPowerData(userData, agent);
         const hivera = powerData?.result?.profile?.HIVERA || 0;
         let power = powerData?.result?.profile?.POWER || 0;
 
@@ -149,6 +149,8 @@ async function processUser(userData, proxy) {
 async function main() {
     log.info(beddu);
     const userDatas = await readUserFile('users.txt');
+    const proxyList = await readProxyFile('proxies.txt');
+
     if (userDatas.length === 0) {
         log.error('No user data found in the file.');
         process.exit(0);
@@ -160,7 +162,10 @@ async function main() {
 
     while (true) {
         log.info('Starting processing for all users...');
-        await Promise.all(userDatas.map(userData => processUser(userData)));
+        await Promise.all(userDatas.map(async (userData, index) => {
+            const proxy = proxyList.length > 0 ? proxyList[index % proxyList.length] : null;
+            await processUser(userData, proxy);
+        }));
 
         log.info('All users processed. Restarting the loop...');
     }
