@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import log from './utils/logger.js';
 import beddu from './utils/banner.js';
 
-// The API base URL
+// The Api base URL
 const url = `https://api.hivera.org/`;
 
 async function readUserFile(filePath) {
