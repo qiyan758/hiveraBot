@@ -85,18 +85,18 @@ async function fetchPowerData(userData, agent) {
 
 function generatePayload() {
     const fromDate = Date.now();
-    const values = [75, 80, 85, 90, 95, 100];
-    const qualityConnection = values[Math.floor(Math.random() * values.length)];
+    const qualityConnection = Math.floor(Math.random() * (93 - 65 + 1)) + 65;
     return {
         from_date: fromDate,
         quality_connection: qualityConnection,
+        times: 10
     };
 }
 
 async function contribute(userData, agent) {
     try {
         const payload = generatePayload();
-        const response = await fetch(`${url}engine/contribute?auth_data=${encodeURIComponent(userData)}`, {
+        const response = await fetch(`${url}v2/engine/contribute?auth_data=${encodeURIComponent(userData)}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -139,8 +139,8 @@ async function processUser(userData, proxy) {
             }
         }
 
-        log.warn(`User ${username} does not have enough power to mine. Cooling down for 35 minutes.`);
-        await new Promise(resolve => setTimeout(resolve, 35 * 60 * 1000));
+        log.warn(`User ${username} does not have enough power to mine. Cooling down for 60 minutes.`);
+        await new Promise(resolve => setTimeout(resolve, 60 * 60 * 1000));
     } catch (error) {
         log.error(`Error processing user ${userData} with proxy ${proxy}:`, error);
     }
